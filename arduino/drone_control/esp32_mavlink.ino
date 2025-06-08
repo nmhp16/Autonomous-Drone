@@ -1017,28 +1017,6 @@ void setup() {
     }
   });
 
-  // DISARM command handler
-  server.on("/disarm", HTTP_GET, [](AsyncWebServerRequest *request) {
-    unsigned long cmdStart = millis();
-    commandCount++;
-    
-    if (fc_detected && fc_armed_status) {
-        if (xSemaphoreTake(rcMutex, pdMS_TO_TICKS(50))) {
-            rc[2] = RC_THROTTLE_LOW;
-            send_rc_override_values(rc[0], rc[1], rc[2], rc[3], rc[4], rc[5], rc[6], rc[7]);
-            xSemaphoreGive(rcMutex);
-        }
-        arm_disarm_vehicle(false);
-        emergencyMode = false;
-        lastLatencyMs = millis() - cmdStart;
-        request->send(200, "text/plain", "DISARM command sent (" + String(lastLatencyMs) + "ms)");
-        Serial.printf("Command: DISARM sent in %lums\n", lastLatencyMs);
-    } else {
-        request->send(503, "text/plain", "Cannot disarm: Not armed or FC disconnected");
-        Serial.println("Command: DISARM rejected");
-    }
-  });
-
   // Movement commands - just update rc values, let loop() handle sending
   server.on("/fwd", HTTP_GET, [](AsyncWebServerRequest *request) {
     unsigned long cmdStart = millis();
@@ -1169,7 +1147,7 @@ void setup() {
     unsigned long cmdStart = millis();
     commandCount++;
     
-    if (fc_detected && fc_armed_status) {
+    if (fc_detected) {
         if (xSemaphoreTake(rcMutex, pdMS_TO_TICKS(50))) {
             rc[2] = RC_THROTTLE_LOW; // Set throttle to minimum immediately
             send_rc_override_values(rc[0], rc[1], rc[2], rc[3], rc[4], rc[5], rc[6], rc[7]); // Send immediately for safety
@@ -1179,10 +1157,10 @@ void setup() {
         emergencyMode = false;
         lastLatencyMs = millis() - cmdStart;
         request->send(200, "text/plain", "DISARM command sent (" + String(lastLatencyMs) + "ms)");
-        Serial.printf("Command: DISARM sent in %lums\n", lastLatencyMs);
+        addWebLog("Command: DISARM sent in %lums\n", lastLatencyMs);
     } else {
         request->send(503, "text/plain", "Cannot disarm: Not armed or FC disconnected");
-        Serial.println("Command: DISARM rejected");
+        addWebLog("Command: DISARM rejected");
     }
   });
 
