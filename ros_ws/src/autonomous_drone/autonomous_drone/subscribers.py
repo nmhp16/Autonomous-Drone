@@ -23,6 +23,9 @@ class MavrosSubscribers:
         self.home = None
         self.altitude = None
 
+        # Virtual GPS from VSLAM (fallback when real GPS unavailable)
+        self.vslam_gps = None
+
         # QoS profile
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT, 
@@ -87,6 +90,14 @@ class MavrosSubscribers:
             qos_profile
         )
 
+        # Subscribe to VSLAM virtual GPS (fallback when real GPS is lost)
+        self.vslam_gps_sub = node.create_subscription(
+            NavSatFix,
+            '/vslam/gps',
+            self._vslam_gps_callback,
+            qos_profile
+        )
+
         node.get_logger().info('MAVROS Subscribers initialized.')
 
     def _state_callback(self, msg: State):
@@ -131,6 +142,10 @@ class MavrosSubscribers:
         """Receives home position"""
         self.home = msg
 
+    def _vslam_gps_callback(self, msg: NavSatFix):
+        """Cache virtual GPS from VSLAM node."""
+        self.vslam_gps = msg
+
     # Helper methods to get latest data
     def is_armed(self) -> bool:
         return self.current_state.armed if self.current_state else False
@@ -155,17 +170,31 @@ class MavrosSubscribers:
     
     def get_global_position(self) -> tuple:
         """
-        Get current GPS position.
+        Get current GPS position, falling back to VSLAM virtual GPS when
+        real GPS is unavailable (status < 0 means no fix).
         Returns: (latitude, longitude, altitude_AMSL)
-        Note: altitude is AMSL (Above Mean Sea Level), not relative to home!
         """
-        if self.gps_fix:
+        if self.gps_fix and self.gps_fix.status.status >= 0:
             return (
                 self.gps_fix.latitude,
                 self.gps_fix.longitude,
                 self.gps_fix.altitude
             )
+        if self.vslam_gps:
+            return (
+                self.vslam_gps.latitude,
+                self.vslam_gps.longitude,
+                self.vslam_gps.altitude
+            )
         return (0.0, 0.0, 0.0)
+
+    def get_gps_source(self) -> str:
+        """Return which GPS source is currently active: 'real', 'vslam', or 'none'."""
+        if self.gps_fix and self.gps_fix.status.status >= 0:
+            return 'real'
+        if self.vslam_gps:
+            return 'vslam'
+        return 'none'
     
     def get_relative_altitude(self) -> float:
         """

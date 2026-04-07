@@ -4,8 +4,10 @@ Subscribers receive data FROM perception/vision nodes
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
+from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Float32, Bool
 from typing import Optional
+import numpy as np
 import time
 import math
 
@@ -28,6 +30,9 @@ class PerceptionSubscribers:
         self.following_cmd = None
         self.following_timestamp = 0.0
         self.target_found = False
+
+        # VSLAM map data
+        self.map_points: Optional[np.ndarray] = None  # (N, 3) float32 world-frame XYZ
 
         # Subscribe to avoidance commands from perception nodes
         self.avoidance_sub = node.create_subscription(
@@ -61,6 +66,14 @@ class PerceptionSubscribers:
             qos_profile=1
         )
 
+        # Subscribe to VSLAM sparse 3-D map
+        self.map_sub = node.create_subscription(
+            PointCloud2,
+            '/vslam/map',
+            self._map_callback,
+            qos_profile=1
+        )
+
         node.get_logger().info('Perception Subscribers initialized.')
 
     def _avoidance_callback(self, msg: TwistStamped):
@@ -88,6 +101,16 @@ class PerceptionSubscribers:
     def _target_found_callback(self, msg: Bool):
         """Receives target found status from object following node"""
         self.target_found = msg.data
+
+    def _map_callback(self, msg: PointCloud2):
+        """
+        Parse the VSLAM PointCloud2 into a (N, 3) numpy array.
+        The map is XYZ float32 with point_step=12 bytes.
+        """
+        n = msg.width * msg.height
+        if n == 0:
+            return
+        self.map_points = np.frombuffer(msg.data, dtype=np.float32).reshape(n, 3)
 
     # Getter methods for perception data
     def get_avoidance_cmd(self) -> TwistStamped:
@@ -152,3 +175,11 @@ class PerceptionSubscribers:
         Returns: True if target is detected, False otherwise
         """
         return self.target_found
+
+    # ── VSLAM map queries ────────────────────────────────────────────────────
+
+    def get_map_point_count(self) -> int:
+        """Return how many 3-D landmarks are currently in the map."""
+        if self.map_points is None:
+            return 0
+        return len(self.map_points)
