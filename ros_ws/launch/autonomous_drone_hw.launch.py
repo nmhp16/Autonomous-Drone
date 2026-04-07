@@ -58,7 +58,15 @@ def generate_launch_description():
             parameters=[{'midas_calib_npz': midas_calib_path}]
         ),
         
-        # Main control node 
+        # VSLAM — visual odometry, sparse map, and virtual GPS
+        Node(
+            package='autonomous_drone',
+            executable='vslam_node',
+            name='vslam_node',
+            output='screen'
+        ),
+
+        # Main control node
         Node(
             package='autonomous_drone',
             executable='node_interface',
