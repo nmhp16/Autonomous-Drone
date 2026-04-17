@@ -24,7 +24,7 @@ source /opt/ros/jazzy/setup.bash
 # Build the package
 echo ""
 echo "Building package from workspace root..."
-colcon build --packages-select autonomous_drone --symlink-install
+colcon build --packages-select autonomous_drone
 
 if [ $? -eq 0 ]; then
     echo ""
@@ -36,7 +36,8 @@ if [ $? -eq 0 ]; then
     echo "  source ~/Desktop/Autonomous-Drone/ros_ws/install/setup.bash"
     echo ""
     echo "Then launch with:"
-    echo "  ros2 launch autonomous_drone autonomous_drone.launch.py"
+    echo "  Simulation: ros2 launch autonomous_drone autonomous_drone_sim.launch.py"
+    echo "  Hardware:   ros2 launch autonomous_drone autonomous_drone_hw.launch.py"
     echo ""
 else
     echo ""
